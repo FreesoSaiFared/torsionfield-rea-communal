@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "torsionfield.community/v1",
+  "project": {
+    "id": "torsionfield-rea-communal",
+    "name": "torsionfield-rea-communal",
+    "origin": "https://github.com/FreesoSaiFared/rea.git",
+    "originCommit": "79156e5bed1d72b83ade0483246f457b337b7e59",
+    "originBranch": "main",
+    "convertedAt": "2026-10-12T08:19:44.417800+00:00",
+    "repository": "https://github.com/FreesoSaiFared/torsionfield-rea-communal"
+  },
+  "agent": {
+    "detectedStacks": [
+      "node"
+    ],
+    "adapter": null,
+    "mcpServer": "node .torsionfield/mcp.mjs"
+  },
+  "community": {
+    "participation": "opt-in",
+    "contributorPrivacy": "local-by-default",
+    "workerCode": "allowlisted-only",
+    "taskTypes": [
+      "prime-range",
+      "digest-text",
+      "agent-request"
+    ],
+    "agentRequests": "proposal-only"
+  }
+}

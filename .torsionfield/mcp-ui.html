@@ -1,0 +1,108 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Torsionfield / Community</title>
+<style>
+:root{font-family:Consolas,monospace;color:#161a1a;background:#e5e4dc;font-size:14px}
+body{margin:0;padding:18px}header{font-size:11px;text-transform:uppercase;letter-spacing:.18em;border-bottom:3px solid;padding-bottom:16px}
+h1{font-size:28px;font-weight:500;letter-spacing:-.06em}section{border-top:1px solid #8a928e;padding-top:15px;margin:18px 0}
+label{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin:12px 0 5px}
+input,select,textarea{width:100%;padding:10px;background:#f1f0e8;border:1px solid #69716b;border-radius:0;box-sizing:border-box}
+textarea{height:95px}button{font:inherit;text-transform:uppercase;letter-spacing:.08em;font-size:11px;background:#171a1b;color:#eee;padding:12px;border:0;cursor:pointer;margin:6px 6px 0 0}
+button:disabled{opacity:.5}p,li{line-height:1.5}#msg{border-left:3px solid #c55b32;padding-left:10px;min-height:20px}
+.task{padding:8px 0;border-bottom:1px solid #acb0a9;font-size:12px}
+.small{font-size:10px;color:#46514e} [hidden]{display:none!important}
+</style>
+<header>TF / Torsionfield · ABP contribution interface</header>
+<h1>Community intelligence.</h1>
+<p class="small">Your participation is optional. Only embedded audited algorithms run here; arbitrary repository code does not.</p>
+<section><strong>01 / Community jobs</strong><div id="tasks">Connecting to host…</div>
+<button id="refresh">Refresh queue</button></section>
+<section><strong>02 / Contribute compute</strong><p>Execute a bounded work unit in this iframe, submit its result to the project coordinator and receive a verified receipt.</p>
+<button id="start">Donate compute</button><button id="stop" disabled>Stop</button><p id="msg">Not volunteering.</p></section>
+<section><strong>03 / Propose work</strong>
+<label for="kind">Job type</label><select id="kind">
+<option value="prime-range">Prime range / split computation</option>
+<option value="agent-request">AI agent research / proposal only</option></select>
+<div id="bounds"><label for="start-range">Range start</label><input type="number" id="start-range" value="200000">
+<label for="end-range">Range end</label><input type="number" id="end-range" value="210000"></div>
+<div id="goal-wrap" hidden><label for="goal">Research task</label>
+<textarea id="goal" placeholder="A concrete question for a capable agent; do not submit private data."></textarea></div>
+<button id="submit">Submit community task</button></section>
+<p class="small">MCP Apps JSON-RPC bridge · ui://torsionfield/community · Local hub required</p>
+<script>
+const el=id=>document.getElementById(id);
+const worker='tf-'+crypto.randomUUID();let active=false,contributed=0,seq=0;
+const pending=new Map();
+function rpc(method,params){return new Promise((resolve,reject)=>{
+ const id=++seq;pending.set(id,{resolve,reject});
+ window.parent.postMessage({jsonrpc:'2.0',id,method,params},'*');
+});}
+function notification(method,params={}){window.parent.postMessage({jsonrpc:'2.0',method,params},'*');}
+window.addEventListener('message',e=>{
+ if(e.source!==window.parent||e.data?.jsonrpc!=='2.0')return;
+ const p=pending.get(e.data.id);if(!p)return;pending.delete(e.data.id);
+ if(e.data.error)p.reject(Error(e.data.error.message));else p.resolve(e.data.result);
+});
+async function tool(name,args={}) {
+ const response=await rpc('tools/call',{name,arguments:args});
+ if(response.isError)throw Error(response.content?.[0]?.text||'Tool error');
+ return response.structuredContent?.data ?? JSON.parse(response.content[0].text);
+}
+async function refresh(){
+ try{const tasks=await tool('torsionfield_tasks');el('tasks').replaceChildren();
+  if(!tasks.length)el('tasks').textContent='No tasks yet.';
+  for(const t of tasks.slice(-12).reverse()){
+   const row=document.createElement('div');row.className='task';
+   row.textContent=t.title+' / '+t.kind+' / '+t.status+' / '+t.completed+' of '+t.units;
+   el('tasks').append(row);
+  }
+ }catch(e){el('tasks').textContent='Hub unavailable: '+e.message;}
+}
+function count(a,b){let n=0;for(let x=a;x<b;x++){let ok=x>=2;for(let d=2;d*d<=x&&ok;d++)if(x%d===0)ok=false;if(ok)n++;}return n;}
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function digestText(s){
+ const raw=new TextEncoder().encode(s);
+ const result=new Uint8Array(await crypto.subtle.digest('SHA-256',raw));
+ return {sha256:Array.from(result).map(v=>v.toString(16).padStart(2,'0')).join(''),
+  chars:s.length,words:s.trim()?s.trim().split(/\s+/).length:0};
+}
+async function donate(){
+ if(active)return;active=true;el('start').disabled=true;el('stop').disabled=false;
+ while(active){
+  try{
+   const unit=await tool('torsionfield_lease',{workerId:worker});
+   if(!unit){await delay(1200);continue;}
+   let result;
+   if(unit.kind==='prime-range')result={count:count(unit.input.start,unit.input.end)};
+   else if(unit.kind==='digest-text')result=await digestText(unit.input.text);
+   else throw Error('Workload not allowlisted');
+   await tool('torsionfield_result',{taskId:unit.taskId,unitId:unit.unitId,
+    leaseId:unit.leaseId,workerId:worker,result});
+   el('msg').textContent='Independently verified contributions: '+(++contributed);
+   await refresh();
+  }catch(e){el('msg').textContent='Work pending / '+e.message;await delay(2000);}
+ }
+ el('start').disabled=false;el('stop').disabled=true;
+}
+el('start').onclick=donate;
+el('stop').onclick=()=>{active=false;el('stop').disabled=true;};
+el('refresh').onclick=refresh;
+el('kind').onchange=()=>{
+ el('bounds').hidden=el('kind').value!=='prime-range';
+ el('goal-wrap').hidden=el('kind').value!=='agent-request';
+};
+el('submit').onclick=async()=>{
+ const kind=el('kind').value;
+ const payload=kind==='prime-range'?{kind,start:Number(el('start-range').value),
+  end:Number(el('end-range').value),title:'Community prime investigation'}:
+  {kind,goal:el('goal').value,title:'Community agent question'};
+ try{await tool('torsionfield_propose',payload);await refresh();}
+ catch(e){el('msg').textContent=e.message;}
+};
+(async()=>{
+ try{
+  await rpc('ui/initialize',{appInfo:{name:'torsionfield-community',version:'0.1.0'},appCapabilities:{}});
+  notification('ui/notifications/initialized');
+  await refresh();
+ }catch(e){el('msg').textContent='MCP Apps bridge unavailable: '+e.message;}
+})();
+</script></html>
