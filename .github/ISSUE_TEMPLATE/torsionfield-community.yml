@@ -1,0 +1,43 @@
+name: Torsionfield Community Investigation
+description: Propose a public research, AI-agent, reverse-engineering or compute task.
+title: "[TF Investigation] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is a public task proposal. Never upload credentials, private binaries,
+        copyrighted material you cannot share, private chats or personal data.
+        Agent/native execution requires a separately reviewed, opted-in contributor.
+  - type: dropdown
+    id: type
+    attributes:
+      label: Task capability
+      options:
+        - Authorized reverse engineering / interoperability
+        - AI agent evaluation or improvement
+        - Research and literature review
+        - Browser automation
+        - Benchmark / reproducibility
+        - Open-source bug fix
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: Goal and acceptance criteria
+      description: Describe the work and the evidence that would show it succeeded.
+      placeholder: Inspect a public program feature, trace its behavior and reproduce a minimal example.
+    validations:
+      required: true
+  - type: textarea
+    id: artifacts
+    attributes:
+      label: Public inputs and allowed tools
+      description: Link to material legally shareable with volunteers.
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Contributor protection
+      options:
+        - label: I have permission to analyze/share these materials and need no volunteer secrets.
+          required: true
